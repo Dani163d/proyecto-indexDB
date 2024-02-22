@@ -99,14 +99,28 @@ class UI {
         }, 3000);
    }
 
-   imprimirCitas({citas}) { // Se puede aplicar destructuring desde la función...
+   imprimirCitas() { 
        
         this.limpiarHTML();
 
         this.textoHeading(citas);
 
-        citas.forEach(cita => {
-            const {mascota, propietario, telefono, fecha, hora, sintomas, id } = cita;
+        const objectStore = DB.transaction('citas').objectStore('citas');
+
+        const fnTextoHeading = this.textoHeading;
+
+        const total = objectStore.count();
+         total.onsuccess = function() {
+            fnTextoHeading(total.result);
+         }
+        
+        objectStore.openCursor().onsuccess = function(e) {
+            
+            const cursor = e.target.result;
+
+            if(cursor) {
+
+                const {mascota, propietario, telefono, fecha, hora, sintomas, id } = cursor.value;
 
             const divCita = document.createElement('div');
             divCita.classList.add('cita', 'p-3');
@@ -156,11 +170,15 @@ class UI {
             divCita.appendChild(btnEditar)
 
             contenedorCitas.appendChild(divCita);
-        });    
+
+            // ve al siguiente elemento
+            cursor.continue();
+            }
+        }
    }
 
-   textoHeading(citas) {
-        if(citas.length > 0 ) {
+   textoHeading(resultado) {
+        if(resultado > 0 ) {
             heading.textContent = 'Administra tus Citas '
         } else {
             heading.textContent = 'No hay Citas, comienza creando una'
@@ -176,7 +194,6 @@ class UI {
 
 
 const administrarCitas = new Citas();
-console.log(administrarCitas);
 const ui = new UI(administrarCitas);
 
 function nuevaCita(e) {
@@ -195,6 +212,8 @@ function nuevaCita(e) {
         // Estamos editando
         administrarCitas.editarCita( {...citaObj} );
 
+        // edita el indeDB
+
         ui.imprimirAlerta('Guardado Correctamente');
 
         formulario.querySelector('button[type="submit"]').textContent = 'Crear Cita';
@@ -202,7 +221,7 @@ function nuevaCita(e) {
         editando = false;
 
     } else {
-        // Nuevo Registrando
+        // Nuevo Registro
 
         // Generar un ID único
         citaObj.id = Date.now();
@@ -213,8 +232,10 @@ function nuevaCita(e) {
         // insertar registro de indexedDB
         const transaction = DB.transaction(['citas'], 'readwrite');
 
+        // habilitar el obkecstore
         const objectStore = transaction.objectStore('citas');
 
+        // insertar en la BD
         objectStore.add(citaObj);
 
     transaction.oncomplete = function() {
@@ -229,7 +250,7 @@ function nuevaCita(e) {
 
 
     // Imprimir el HTML de citas
-    ui.imprimirCitas(administrarCitas);
+    ui.imprimirCitas();
 
     // Reinicia el objeto para evitar futuros problemas de validación
     reiniciarObjeto();
@@ -253,7 +274,7 @@ function reiniciarObjeto() {
 function eliminarCita(id) {
     administrarCitas.eliminarCita(id);
 
-    ui.imprimirCitas(administrarCitas)
+    ui.imprimirCitas()
 }
 
 function cargarEdicion(cita) {
@@ -297,6 +318,9 @@ function crearDB() {
         console.log('bd creada')
 
         DB = crearDB.result;
+
+        // mostra citas al cargar (pero indexed ya esta lis)
+        ui.imprimirCitas();
     }
 
     // definir el schema
@@ -321,3 +345,6 @@ function crearDB() {
 
     }
 }
+
+
+
